@@ -3,11 +3,11 @@
 In some container environments, secret sources are not always readily available or secure.  Serverless options such as GCP's Cloud Run require your application to directly
 interface with Secret Manager or another source.  vals-entrypoint is intended to serve as an exec wrapper for your applications to launch in environments where secret material is to be retrieved by using ambient credentials such as a GCE service account.
 
-vals-entrypoint supports substituting secrets into environment variables, as well as writing secrets to the filesystem.  To do this, it relieas on [vals](https://github.com/variantdev/vals) to provide integrations with major cloud providers and on-prem secret stores.
+vals-entrypoint supports substituting secrets into environment variables, as well as writing secrets to the filesystem.  To do this, it relies on [vals](https://github.com/variantdev/vals) to provide integrations with major cloud providers and on-prem secret stores.
 
 - All environment variables containing vars secretrefs will be evaluated
 - `VARS_FILES` environment variable can be set to a list of file/secretref pairs to write the corresponding secretref to a file
-- --vars-files flag can be set to a similar list of file/secretref pairs to be written out
+- `--vars-files` flag can be set to a similar list of file/secretref pairs to be written out
 
 # Examples
 
