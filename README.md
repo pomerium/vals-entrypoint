@@ -51,5 +51,5 @@ FROM pomerium/pomerium:latest
 COPY --from=base /bin/vals-entrypoint /bin/vals-entrypoint
 
 ENTRYPOINT ["/bin/vals-entrypoint"]
-CMD ["/bin/pomerium","-config","/pomerium/config.yaml"]
+CMD ["exec","--","/bin/pomerium","-config","/pomerium/config.yaml"]
 ```
