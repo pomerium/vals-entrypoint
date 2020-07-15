@@ -8,48 +8,106 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/spf13/cobra"
+
 	"github.com/spf13/viper"
 	"github.com/variantdev/vals"
 )
 
-const fileRefVariable = "VALS_FILE"
-const testVariable = "VALS_TEST"
 const cacheSize = 256
+const fileRefVariable = "VALS_FILES"
 
-// Usage
-// VALS_NAME1=[secretref] VALS_NAME2=[secretref] VALS_FILE=[/path/to/file]:[secretref] vals-entrypoint [command]
+var rootCmd = &cobra.Command{
+	Use:  "vals-entrypoint",
+	Long: "Bootstrap environment variables and config files from secrets engines supported by `val`",
+}
+
+var execCmd = &cobra.Command{
+	Use:   "exec",
+	Short: "execute the following command with variables interpollated and files generated",
+	Args:  cobra.MinimumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		return run(args)
+	},
+}
 
 func init() {
+	rootCmd.PersistentFlags().String("vals-files", "", "specify comma separated list of file(s) to write a secret into.  format: [/path/to/file.yaml:ref+gcpsecrets://my-project-id/test]")
+	rootCmd.PersistentFlags().Bool("test", false, "run in test mode and output results of interpollation")
+
+	if err := viper.BindPFlags(rootCmd.PersistentFlags()); err != nil {
+		panic(err)
+	}
+
+	if err := viper.BindEnv("vals-files", fileRefVariable); err != nil {
+		panic(err)
+	}
+
+	if err := viper.BindPFlag("test", rootCmd.PersistentFlags().Lookup("test")); err != nil {
+		panic(err)
+	}
+
 	viper.AutomaticEnv()
+	rootCmd.AddCommand(execCmd)
 }
 
 func main() {
-	err := run()
-	if err != nil {
-		fmt.Fprint(os.Stderr, err)
+	if err := rootCmd.Execute(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func run() error {
+func run(command []string) error {
+	valsfiles := viper.GetStringSlice("vals-files")
 
 	val, err := vals.New(vals.Options{CacheSize: cacheSize})
 	if err != nil {
 		return fmt.Errorf("failed to initialize vals: %s", err)
 	}
 
-	fileRefs, _ := getFileRefs(viper.GetStringSlice("vals_file"))
+	files, err := renderFiles(val, valsfiles)
+	if err != nil {
+		return fmt.Errorf("failed to render files: %w", err)
+	}
+
+	envs, err := renderVars(val)
+	if err != nil {
+		return fmt.Errorf("failed to render vars: %w", err)
+	}
+
+	if viper.GetBool("test") {
+		fmt.Printf("vars: %v\n\n", envs)
+		fmt.Printf("files: %v\n\n", files)
+		return nil
+	}
+
+	if len(valsfiles) > 0 {
+		err = writeFiles(files)
+		if err != nil {
+			return fmt.Errorf("failed to write file: %w", err)
+		}
+	}
+
+	return runExec(command, envs)
+}
+
+func renderFiles(val *vals.Runtime, in []string) (map[string]string, error) {
+	fileRefs, _ := getFileRefs(in)
 	renderedFileRefs, err := val.Eval(map[string]interface{}{
 		"inline": fileRefs,
 	})
-
 	if err != nil {
-		return fmt.Errorf("failed to render file refs: %s", err)
+		return nil, fmt.Errorf("failed to render file refs: %s", err)
 	}
 
+	return mapInterfaceToMapString(renderedFileRefs["inline"].(map[string]interface{})), nil
+}
+
+func renderVars(val *vals.Runtime) (map[string]string, error) {
 	envRefs, err := getEnvRefs(findVariables())
 	if err != nil {
-		return fmt.Errorf("failed to locate env refs: %w", err)
+		return nil, fmt.Errorf("failed to locate env refs: %w", err)
 	}
 
 	renderedEnvRefs, err := val.Eval(map[string]interface{}{
@@ -57,28 +115,14 @@ func run() error {
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to render env refs: %w", err)
+		return nil, fmt.Errorf("failed to render env refs: %w", err)
 	}
 
-	envs := mapInterfaceToMapString(renderedEnvRefs["inline"].(map[string]interface{}))
-	files := mapInterfaceToMapString(renderedFileRefs["inline"].(map[string]interface{}))
-
-	if viper.GetBool(testVariable) {
-		fmt.Printf("vars: %v\n\n", envs)
-		fmt.Printf("files: %v\n\n", files)
-		return nil
-	}
-
-	err = writeFiles(files)
-	if err != nil {
-		return fmt.Errorf("failed to write file: %w", err)
-	}
-
-	return runExec(envs)
+	return mapInterfaceToMapString(renderedEnvRefs["inline"].(map[string]interface{})), nil
 }
 
-func runExec(env map[string]string) error {
-	cmd := exec.Command(os.Args[1], os.Args[2:]...)
+func runExec(command []string, env map[string]string) error {
+	cmd := exec.Command(command[0], command[1:]...)
 	cmd.Stderr = os.Stderr
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
@@ -156,7 +200,7 @@ func getEnvRefs(in []string) (map[string]interface{}, error) {
 		if v == fileRefVariable {
 			continue
 		}
-		refs[v] = viper.GetString(v)
+		refs[v] = os.Getenv(v)
 	}
 
 	return refs, nil

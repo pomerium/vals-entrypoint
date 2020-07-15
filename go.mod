@@ -24,7 +24,7 @@ require (
 	github.com/mozilla-services/yaml v0.0.0-20191106225358-5c216288813c // indirect
 	github.com/pierrec/lz4 v2.5.2+incompatible // indirect
 	github.com/sirupsen/logrus v1.6.0 // indirect
-	github.com/spf13/cobra v1.0.0 // indirect
+	github.com/spf13/cobra v1.0.0
 	github.com/spf13/viper v1.7.0
 	github.com/stretchr/testify v1.5.1 // indirect
 	github.com/variantdev/vals v0.7.1
