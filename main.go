@@ -161,7 +161,6 @@ func writeFiles(files map[string]string) error {
 			return err
 		}
 	}
-
 	return nil
 }
 
