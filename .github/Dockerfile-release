@@ -1,0 +1,6 @@
+FROM gcr.io/distroless/static
+COPY vals-entrypoint /bin/vals-entrypoint
+
+ENTRYPOINT [ "/bin/vals-entrypoint" ]
+
+

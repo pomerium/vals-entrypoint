@@ -1,0 +1,58 @@
+# This is an example goreleaser.yaml file with some sane defaults.
+# Make sure to check the documentation at http://goreleaser.com
+release:
+  github:
+    owner: pomerium
+    name: vals-entrypoint
+  name_template: "v{{.Version}}"
+
+before:
+  hooks:
+    # You may remove this if you don't use go modules.
+    - go mod download
+env:
+  - GO111MODULE=on
+  - CGO_ENABLED=0
+builds:
+  - goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - arm64
+      - amd64
+
+archives:
+  - format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - none*
+
+dockers:
+  - image_templates:
+      - "pomerium/vals-entrypoint:{{ .Tag }}"
+      - "pomerium/vals-entrypoint:latest"
+    dockerfile: .github/Dockerfile-release
+    goos: linux
+    goarch: amd64
+    build_flag_templates:
+      - "--pull"
+      - "--label=org.opencontainers.image.created={{.Date}}"
+      - "--label=org.opencontainers.image.name={{.ProjectName}}"
+      - "--label=org.opencontainers.image.revision={{.FullCommit}}"
+      - "--label=org.opencontainers.image.version={{.Version}}"
+      - "--label=org.opencontainers.image.source={{.GitURL}}"
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  name_template: "{{ .Tag }}-next"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
